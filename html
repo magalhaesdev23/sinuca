@@ -1,0 +1,1433 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Sinuca Master Club - Ultra Engine</title>
+    <style>
+        :root {
+            --wood-dark: #2a1b15;
+            --wood-light: #5d4037;
+            --felt-base: #0f6b36;
+            --felt-dark: #0a4a25;
+            --gold: #ffc107;
+            --ui-bg: rgba(18, 18, 18, 0.95);
+            --text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #0d0d0d;
+            color: white;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            max-width: 1400px;
+            max-height: 787.5px;
+            background: #000;
+            box-shadow: 0 0 80px rgba(0,0,0,0.9);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        canvas {
+            display: block;
+            border-radius: 6px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+        }
+
+        /* UI Layers */
+        .ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 24px;
+            box-sizing: border-box;
+            font-weight: 500;
+        }
+
+        .hud-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            pointer-events: auto;
+        }
+
+        .player-card {
+            background: linear-gradient(135deg, rgba(30,30,30,0.9), rgba(10,10,10,0.95));
+            padding: 12px 24px;
+            border-radius: 12px;
+            border-left: 4px solid #444;
+            min-width: 180px;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255,255,255,0.05);
+            position: relative;
+        }
+        
+        .player-card.active {
+            border-left-color: var(--gold);
+            background: linear-gradient(135deg, rgba(50,40,10,0.9), rgba(20,20,20,0.95));
+            box-shadow: 0 4px 20px rgba(255, 193, 7, 0.15);
+            transform: translateY(2px);
+        }
+
+        .player-name { font-size: 1.1rem; font-weight: bold; margin-bottom: 4px; color: #eee; }
+        .player-type { font-size: 0.85rem; color: #aaa; text-transform: uppercase; letter-spacing: 1px; }
+
+        /* Ball Counter Badge */
+        .ball-count-badge {
+            position: absolute;
+            top: -10px;
+            right: -10px;
+            background: var(--gold);
+            color: #000;
+            font-weight: 800;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .ball-count-badge.visible { opacity: 1; }
+
+        .game-status {
+            text-align: center;
+            background: rgba(0,0,0,0.6);
+            padding: 8px 20px;
+            border-radius: 20px;
+            backdrop-filter: blur(4px);
+        }
+        
+        .game-mode-title { font-size: 1.5rem; letter-spacing: 2px; color: var(--gold); text-shadow: var(--text-shadow); font-weight: 800; }
+        .money-badge { color: #4caf50; font-weight: bold; margin-top: 5px; font-size: 1.1rem; }
+
+        .controls-overlay {
+            pointer-events: auto;
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            align-self: flex-end;
+            background: rgba(0,0,0,0.7);
+            padding: 15px;
+            border-radius: 50px;
+            border: 1px solid rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        .spin-control {
+            width: 70px;
+            height: 70px;
+            background: radial-gradient(circle at 30% 30%, #fff, #ddd);
+            border-radius: 50%;
+            border: 4px solid #222;
+            position: relative;
+            cursor: pointer;
+            box-shadow: inset 0 -5px 10px rgba(0,0,0,0.2);
+        }
+
+        .spin-dot {
+            width: 8px;
+            height: 8px;
+            background: #e53935;
+            border-radius: 50%;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.5);
+            pointer-events: none;
+        }
+
+        .power-wrapper { display: flex; flex-direction: column; gap: 5px; }
+        .power-label { font-size: 0.75rem; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-left: 5px;}
+        .power-bar-container {
+            width: 240px;
+            height: 12px;
+            background: #111;
+            border: 1px solid #444;
+            border-radius: 6px;
+            overflow: hidden;
+            position: relative;
+        }
+        .power-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #ffeb3b, #ff9800, #f44336);
+            transition: width 0.05s linear;
+            box-shadow: 0 0 10px rgba(255, 152, 0, 0.5);
+        }
+
+        .menu-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(5, 5, 5, 0.96);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 20;
+            pointer-events: auto;
+            backdrop-filter: blur(8px);
+        }
+
+        .menu-screen.hidden { display: none; }
+        
+        .menu-section { display: flex; flex-direction: column; align-items: center; width: 100%; }
+        .menu-section.hidden { display: none; }
+
+        h1 {
+            font-size: 4rem;
+            background: linear-gradient(to bottom, #ffd700, #b8860b);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin: 0 0 10px 0;
+            text-transform: uppercase;
+            letter-spacing: 6px;
+            filter: drop-shadow(0 4px 10px rgba(0,0,0,0.5));
+        }
+
+        .menu-btn {
+            background: transparent;
+            color: #fff;
+            border: 1px solid rgba(255,255,255,0.2);
+            padding: 16px 40px;
+            margin: 8px;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            min-width: 260px;
+            text-align: center;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            position: relative;
+            overflow: hidden;
+            border-radius: 4px;
+        }
+
+        .menu-btn::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; width: 0%; height: 100%;
+            background: var(--gold);
+            z-index: -1;
+            transition: width 0.3s ease;
+        }
+
+        .menu-btn:hover::before { width: 100%; }
+        .menu-btn:hover { color: #000; border-color: var(--gold); font-weight: bold; transform: scale(1.02); }
+
+        .toggle-row {
+            margin-top: 30px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #aaa;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+        .toggle-row input { accent-color: var(--gold); width: 20px; height: 20px; }
+
+        .shop-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 25px;
+            margin: 20px 0;
+            max-width: 800px;
+        }
+
+        .shop-item {
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: transform 0.2s, border-color 0.2s;
+            position: relative;
+        }
+        .shop-item:hover { transform: translateY(-5px); border-color: #666; }
+        .shop-item.owned { border-color: #4caf50; }
+        .shop-item.selected { border: 2px solid var(--gold); background: #252210; }
+        .shop-item.selected::after { content: 'EQUIPADO'; position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background: var(--gold); color: black; font-size: 0.7rem; padding: 2px 8px; border-radius: 10px; font-weight: bold; }
+
+        .cue-preview { width: 100%; height: 8px; border-radius: 4px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.5); }
+
+        /* Code Input Style */
+        .code-area {
+            margin-top: 30px;
+            display: flex;
+            gap: 10px;
+            background: rgba(255,255,255,0.05);
+            padding: 10px;
+            border-radius: 8px;
+        }
+        .code-input {
+            background: transparent;
+            border: 1px solid #444;
+            color: white;
+            padding: 10px;
+            font-size: 1rem;
+            border-radius: 4px;
+            text-transform: uppercase;
+        }
+        .code-btn {
+            background: #333;
+            color: white;
+            border: none;
+            padding: 0 20px;
+            cursor: pointer;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .code-btn:hover { background: var(--gold); color: black; }
+
+        #notification {
+            position: absolute;
+            top: 40%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 3rem;
+            font-weight: 800;
+            color: #fff;
+            text-shadow: 0 4px 10px rgba(0,0,0,0.8);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.4s, transform 0.4s;
+            z-index: 50;
+        }
+        #notification.show { opacity: 1; transform: translate(-50%, -60%) scale(1.1); }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <canvas id="poolCanvas"></canvas>
+
+    <!-- UI Overlay -->
+    <div class="ui-layer">
+        <div class="hud-top">
+            <div id="player1-card" class="player-card active">
+                <div class="player-name">JOGADOR 1</div>
+                <div id="p1-type" class="player-type">Sua Vez</div>
+                <div id="p1-score-badge" class="ball-count-badge visible">BOLAS: 0</div>
+            </div>
+            
+            <div class="game-status">
+                <div class="game-mode-title">8-BALL PRO</div>
+                <div id="score-display" class="money-badge">$100</div>
+            </div>
+            
+            <div id="player2-card" class="player-card">
+                <div class="player-name">JOGADOR 2</div>
+                <div id="p2-type" class="player-type">Aguardando</div>
+                <div id="p2-score-badge" class="ball-count-badge visible">BOLAS: 0</div>
+            </div>
+        </div>
+
+        <div class="controls-overlay" id="controls">
+            <div class="spin-control" id="spinCtrl" title="Efeito na bola">
+                <div class="spin-dot" id="spinDot"></div>
+            </div>
+            <div class="power-wrapper">
+                <div class="power-label">Força do Taco</div>
+                <div class="power-bar-container">
+                    <div class="power-fill" id="powerBar"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="notification"></div>
+
+    <!-- Main Menu -->
+    <div id="main-menu" class="menu-screen">
+        <h1>Sinuca Master</h1>
+        <div style="margin-bottom: 40px; color: #888; font-size: 1.1rem;">Engine Física 2.1 • Bugfixes</div>
+        
+        <!-- Nível Raiz do Menu -->
+        <div id="menu-root" class="menu-section">
+            <button class="menu-btn" onclick="UI.showDifficultyMenu()">Modo Treino (Vs CPU)</button>
+            <button class="menu-btn" onclick="Game.start('pvp')">Multijogador Local</button>
+            <button class="menu-btn" style="margin-top: 20px; border-color: #666;" onclick="UI.showShop()">Loja de Tacos</button>
+            <label class="toggle-row">
+                <input type="checkbox" id="rule-brazilian"> 
+                Regra Brasileira (Bola Menor)
+            </label>
+        </div>
+
+        <!-- Submenu Dificuldade -->
+        <div id="menu-difficulty" class="menu-section hidden">
+            <h2 style="color:var(--gold)">SELECIONE A DIFICULDADE</h2>
+            <button class="menu-btn" onclick="Game.start('pve_easy')">Fácil</button>
+            <button class="menu-btn" onclick="Game.start('pve_med')">Médio</button>
+            <button class="menu-btn" onclick="Game.start('pve_hard')">Difícil</button>
+            <button class="menu-btn" style="margin-top:20px; border-color:#444;" onclick="UI.hideDifficultyMenu()">Voltar</button>
+        </div>
+    </div>
+
+    <!-- Shop -->
+    <div id="shop-screen" class="menu-screen hidden">
+        <h2 style="color:var(--gold); font-size: 2rem; margin-bottom: 0;">ARSENAL</h2>
+        <div id="shop-balance" style="color: #fff; font-size: 1.2rem; margin-bottom: 10px; opacity: 0.8;"></div>
+        
+        <div class="shop-grid" id="shop-items"></div>
+        
+        <!-- Código de Resgate -->
+        <div class="code-area">
+            <input type="text" id="promo-code-input" class="code-input" placeholder="Código Promocional">
+            <button class="code-btn" onclick="Economy.redeemCode()">RESGATAR</button>
+        </div>
+
+        <button class="menu-btn" style="margin-top:30px" onclick="UI.hideShop()">Voltar ao Menu</button>
+    </div>
+
+    <!-- Game Over -->
+    <div id="game-over-screen" class="menu-screen hidden">
+        <h1 id="winner-text" style="font-size: 3rem;">VENCEDOR</h1>
+        <div id="win-amount" style="font-size: 1.5rem; color: #4caf50; margin-bottom: 30px;">Prêmio: $50</div>
+        <button class="menu-btn" onclick="Game.resetToMenu()">Menu Principal</button>
+        <button class="menu-btn" onclick="Game.rematch()">Jogar Novamente</button>
+    </div>
+</div>
+
+<script>
+/**
+ * SINUCA MASTER CLUB - ENGINE CORE V2.1 (PHYSICS & MENU UPDATE)
+ */
+
+// --- MATH UTILS ---
+
+class Vector2 {
+    constructor(x, y) { this.x = x; this.y = y; }
+    add(v) { return new Vector2(this.x + v.x, this.y + v.y); }
+    sub(v) { return new Vector2(this.x - v.x, this.y - v.y); }
+    mult(s) { return new Vector2(this.x * s, this.y * s); }
+    div(s) { return new Vector2(this.x / s, this.y / s); }
+    dot(v) { return this.x * v.x + this.y * v.y; }
+    cross(v) { return this.x * v.y - this.y * v.x; }
+    mag() { return Math.sqrt(this.x * this.x + this.y * this.y); }
+    magSq() { return this.x * this.x + this.y * this.y; }
+    norm() { const m = this.mag(); return m === 0 ? new Vector2(0,0) : this.div(m); }
+    dist(v) { return this.sub(v).mag(); }
+    copy() { return new Vector2(this.x, this.y); }
+    static fromAngle(angle) { return new Vector2(Math.cos(angle), Math.sin(angle)); }
+}
+
+class Matrix3 {
+    constructor() { this.loadIdentity(); }
+    loadIdentity() { this.m = [1,0,0, 0,1,0, 0,0,1]; }
+    
+    rotate(x, y, z, angle) {
+        const c = Math.cos(angle);
+        const s = Math.sin(angle);
+        const t = 1 - c;
+        const rm = [
+            t*x*x + c,   t*x*y - s*z, t*x*z + s*y,
+            t*x*y + s*z, t*y*y + c,   t*y*z - s*x,
+            t*x*z - s*y, t*y*z + s*x, t*z*z + c
+        ];
+        const result = new Array(9);
+        const a = this.m;
+        result[0] = a[0]*rm[0] + a[1]*rm[3] + a[2]*rm[6];
+        result[1] = a[0]*rm[1] + a[1]*rm[4] + a[2]*rm[7];
+        result[2] = a[0]*rm[2] + a[1]*rm[5] + a[2]*rm[8];
+        result[3] = a[3]*rm[0] + a[4]*rm[3] + a[5]*rm[6];
+        result[4] = a[3]*rm[1] + a[4]*rm[4] + a[5]*rm[7];
+        result[5] = a[3]*rm[2] + a[4]*rm[5] + a[5]*rm[8];
+        result[6] = a[6]*rm[0] + a[7]*rm[3] + a[8]*rm[6];
+        result[7] = a[6]*rm[1] + a[7]*rm[4] + a[8]*rm[7];
+        result[8] = a[6]*rm[2] + a[7]*rm[5] + a[8]*rm[8];
+        this.m = result;
+    }
+    
+    transform(p) {
+        return {
+            x: this.m[0]*p.x + this.m[1]*p.y + this.m[2]*p.z,
+            y: this.m[3]*p.x + this.m[4]*p.y + this.m[5]*p.z,
+            z: this.m[6]*p.x + this.m[7]*p.y + this.m[8]*p.z
+        };
+    }
+}
+
+// --- CONFIGURAÇÃO ---
+
+const CONFIG = {
+    WIDTH: 1000,
+    HEIGHT: 500,
+    BALL_RADIUS: 14,
+    POCKET_RADIUS: 24,
+    CUSHION_SIZE: 25,
+    PHYSICS_SUBSTEPS: 12,
+    FRICTION_ROLL: 0.992,
+    FRICTION_SLIDE: 0.985, 
+    RESTITUTION_BALL: 0.96,
+    RESTITUTION_WALL: 0.75,
+    STOP_THRESHOLD: 0.035,
+    MAX_POWER: 28
+};
+
+const COLORS = {
+    BALLS: [
+        "#fff", // 0 Cue
+        "#e9c404", "#204691", "#cf142b", "#4b2878", "#ff5c00", "#186e2f", "#771d17", "#1a1a1a", // 1-8
+        "#e9c404", "#204691", "#cf142b", "#4b2878", "#ff5c00", "#186e2f", "#771d17" // 9-15
+    ]
+};
+
+// --- ENTITIES ---
+
+class Ball {
+    constructor(id, x, y) {
+        this.id = id;
+        this.pos = new Vector2(x, y);
+        this.vel = new Vector2(0, 0);
+        this.radius = CONFIG.BALL_RADIUS;
+        this.mass = 1; 
+        this.active = true;
+        this.inPocket = false;
+        
+        this.rotation = new Matrix3();
+        this.isStripe = id > 8;
+        this.color = COLORS.BALLS[id];
+        
+        this.pocketScale = 1;
+        this.pocketAlpha = 1;
+    }
+
+    update() {
+        if (!this.active) return;
+        
+        if (this.inPocket) {
+            this.pocketScale *= 0.85;
+            this.pocketAlpha -= 0.1;
+            this.pos = this.pos.add(this.vel);
+            if (this.pocketAlpha <= 0) this.active = false;
+            return;
+        }
+
+        this.vel = this.vel.mult(CONFIG.FRICTION_ROLL);
+        if (this.vel.magSq() < CONFIG.STOP_THRESHOLD * CONFIG.STOP_THRESHOLD) {
+            this.vel = new Vector2(0, 0);
+        }
+        this.pos = this.pos.add(this.vel);
+
+        const speed = this.vel.mag();
+        if (speed > 0.001) {
+            const angle = speed / this.radius;
+            const axisX = -this.vel.y / speed;
+            const axisY = this.vel.x / speed;
+            this.rotation.rotate(axisX, axisY, 0, angle);
+        }
+    }
+
+    draw(ctx) {
+        if (!this.active && this.pocketAlpha <= 0) return;
+
+        ctx.save();
+        ctx.translate(this.pos.x, this.pos.y);
+        
+        if (this.inPocket) {
+            ctx.scale(this.pocketScale, this.pocketScale);
+            ctx.globalAlpha = this.pocketAlpha;
+        }
+
+        const lightX = CONFIG.WIDTH / 2;
+        const lightY = CONFIG.HEIGHT / 2;
+        const shadowOffX = (this.pos.x - lightX) * 0.03;
+        const shadowOffY = (this.pos.y - lightY) * 0.03;
+        const shadowBlur = 4 + Math.abs(shadowOffX)*0.2;
+
+        ctx.save();
+        ctx.translate(shadowOffX, shadowOffY);
+        ctx.beginPath();
+        ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+        ctx.shadowColor = 'rgba(0,0,0,0.6)';
+        ctx.shadowBlur = shadowBlur;
+        ctx.fill();
+        ctx.restore();
+
+        ctx.beginPath();
+        ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+        ctx.clip(); 
+
+        ctx.fillStyle = this.id === 0 ? '#fffae6' : (this.isStripe ? '#fffae6' : this.color);
+        if (this.id === 8) ctx.fillStyle = '#1a1a1a';
+        ctx.fill();
+
+        const upVec = this.rotation.transform({x:0, y:1, z:0});
+        
+        if (this.isStripe) {
+            const stripeAngle = Math.atan2(upVec.y, upVec.x);
+            ctx.save();
+            ctx.rotate(stripeAngle);
+            ctx.fillStyle = this.color;
+            ctx.fillRect(-this.radius, -8, this.radius*2, 16);
+            ctx.restore();
+        }
+
+        if (this.id > 0) {
+            const numPos = this.rotation.transform({x:0, y:0, z:this.radius});
+            if (numPos.z > -5) { 
+                const scale = 0.4 + (numPos.z + this.radius) / (2*this.radius) * 0.6;
+                ctx.save();
+                ctx.translate(numPos.x, numPos.y);
+                ctx.scale(scale, scale);
+                ctx.beginPath();
+                ctx.arc(0, 0, 7, 0, Math.PI*2);
+                ctx.fillStyle = 'rgba(255,255,255,0.9)';
+                ctx.fill();
+                ctx.fillStyle = '#000';
+                ctx.font = 'bold 8px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(this.id, 0, 1);
+                if(this.id===6 || this.id===9) {
+                    ctx.beginPath(); ctx.moveTo(-2, 4); ctx.lineTo(2, 4); ctx.stroke();
+                }
+                ctx.restore();
+            }
+        }
+
+        const grad = ctx.createRadialGradient(-5, -5, 2, 0, 0, this.radius);
+        grad.addColorStop(0, 'rgba(255,255,255,0.2)'); 
+        grad.addColorStop(0.5, 'rgba(0,0,0,0)');
+        grad.addColorStop(1, 'rgba(0,0,0,0.4)'); 
+        ctx.fillStyle = grad;
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.arc(-CONFIG.BALL_RADIUS*0.3, -CONFIG.BALL_RADIUS*0.3, 4, 0, Math.PI*2);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.35)';
+        ctx.fill();
+
+        ctx.restore(); 
+    }
+}
+
+// --- PHYSICS ENGINE ---
+
+const Physics = {
+    // CORREÇÃO DE BUG: Verificar se está perto da caçapa
+    isNearPocket: function(ball, pockets) {
+        for(let p of pockets) {
+            // Se estiver a menos de 2x o raio da caçapa, ignora paredes
+            if(ball.pos.dist(p) < CONFIG.POCKET_RADIUS * 1.8) return true;
+        }
+        return false;
+    },
+
+    resolveCollisions: function(balls, pockets) {
+        // 1. Ball vs Ball
+        for (let i = 0; i < balls.length; i++) {
+            for (let j = i + 1; j < balls.length; j++) {
+                const b1 = balls[i];
+                const b2 = balls[j];
+
+                if (!b1.active || !b2.active || b1.inPocket || b2.inPocket) continue;
+
+                const n = b1.pos.sub(b2.pos);
+                const distSq = n.magSq();
+                const minDist = b1.radius + b2.radius;
+
+                if (distSq < minDist * minDist && distSq > 0) {
+                    const dist = Math.sqrt(distSq);
+                    const normal = n.div(dist); 
+                    const relVel = b1.vel.sub(b2.vel);
+                    const velAlongNormal = relVel.dot(normal);
+
+                    if (velAlongNormal > 0) continue;
+
+                    let jVal = -(1 + CONFIG.RESTITUTION_BALL) * velAlongNormal;
+                    jVal /= (1/b1.mass + 1/b2.mass); 
+
+                    const impulse = normal.mult(jVal);
+                    b1.vel = b1.vel.add(impulse.div(b1.mass));
+                    b2.vel = b2.vel.sub(impulse.div(b2.mass));
+
+                    const percent = 0.8; 
+                    const slop = 0.01; 
+                    const penetration = minDist - dist;
+                    if (penetration > slop) {
+                        const correction = normal.mult((penetration * percent) / 2);
+                        b1.pos = b1.pos.add(correction);
+                        b2.pos = b2.pos.sub(correction);
+                    }
+                    
+                    if (Math.abs(velAlongNormal) > 5) Game.juice.shake = Math.abs(velAlongNormal) * 0.5;
+                }
+            }
+        }
+
+        // 2. Ball vs Cushion (CORRIGIDO)
+        const W = CONFIG.WIDTH;
+        const H = CONFIG.HEIGHT;
+        const C = CONFIG.CUSHION_SIZE;
+        const R = CONFIG.BALL_RADIUS;
+
+        balls.forEach(b => {
+            if (!b.active || b.inPocket) return;
+
+            // BUG FIX: Se estiver perto de uma caçapa, não colide com a tabela
+            if (this.isNearPocket(b, pockets)) return;
+
+            let col = false;
+            // Left
+            if (b.pos.x < C + R) {
+                b.pos.x = C + R;
+                b.vel.x *= -CONFIG.RESTITUTION_WALL;
+                col = true;
+            }
+            // Right
+            else if (b.pos.x > W - C - R) {
+                b.pos.x = W - C - R;
+                b.vel.x *= -CONFIG.RESTITUTION_WALL;
+                col = true;
+            }
+            // Top
+            if (b.pos.y < C + R) {
+                b.pos.y = C + R;
+                b.vel.y *= -CONFIG.RESTITUTION_WALL;
+                col = true;
+            }
+            // Bottom
+            else if (b.pos.y > H - C - R) {
+                b.pos.y = H - C - R;
+                b.vel.y *= -CONFIG.RESTITUTION_WALL;
+                col = true;
+            }
+            
+            if (col) {
+                b.vel = b.vel.mult(CONFIG.FRICTION_SLIDE); 
+            }
+        });
+    },
+
+    checkPockets: function(balls, pockets) {
+        balls.forEach(b => {
+            if(b.inPocket || !b.active) return;
+            
+            for(let p of pockets) {
+                const d = b.pos.dist(p);
+                // Levemente aumentado para facilitar
+                if (d < CONFIG.POCKET_RADIUS * 1.0) {
+                    b.inPocket = true;
+                    Game.onBallPot(b);
+                    return;
+                }
+            }
+        });
+    }
+};
+
+// --- GAME LOGIC ---
+
+const Game = {
+    canvas: null,
+    ctx: null,
+    balls: [],
+    pockets: [],
+    state: 'MENU', 
+    turn: 'PLAYER1',
+    currentPlayer: 1,
+    tableTexture: null,
+    
+    config: {
+        mode: 'pve', 
+        difficulty: 'easy',
+        brazilianRules: false
+    },
+    
+    matchState: {
+        assigned: null, 
+        p1Team: null,
+        foul: false,
+        pottedThisTurn: [],
+        gameOver: false,
+        p1PotCount: 0,
+        p2PotCount: 0
+    },
+    
+    juice: { shake: 0 },
+
+    init: function() {
+        this.canvas = document.getElementById('poolCanvas');
+        this.ctx = this.canvas.getContext('2d', { alpha: false }); 
+        
+        this.resize();
+        window.addEventListener('resize', () => this.resize());
+        
+        Input.init(this.canvas);
+        Economy.init();
+        
+        this.generateTableTexture();
+        
+        const w = CONFIG.WIDTH;
+        const h = CONFIG.HEIGHT;
+        const offset = 12; // Ajustado
+        this.pockets = [
+            new Vector2(offset, offset), new Vector2(w/2, offset-5), new Vector2(w-offset, offset),
+            new Vector2(offset, h-offset), new Vector2(w/2, h-offset+5), new Vector2(w-offset, h-offset)
+        ];
+
+        requestAnimationFrame(t => this.loop(t));
+    },
+
+    generateTableTexture: function() {
+        const pCanvas = document.createElement('canvas');
+        pCanvas.width = 256; pCanvas.height = 256;
+        const pCtx = pCanvas.getContext('2d');
+        pCtx.fillStyle = '#0f6b36';
+        pCtx.fillRect(0,0,256,256);
+        for(let i=0; i<8000; i++) {
+            const x = Math.random() * 256;
+            const y = Math.random() * 256;
+            pCtx.fillStyle = Math.random() > 0.5 ? '#147d41' : '#0a4a25';
+            pCtx.globalAlpha = 0.3;
+            pCtx.fillRect(x,y, 2, 2);
+        }
+        this.tableTexture = this.ctx.createPattern(pCanvas, 'repeat');
+    },
+
+    resize: function() {
+        const container = document.getElementById('game-container');
+        const aspect = CONFIG.WIDTH / CONFIG.HEIGHT;
+        const screenW = container.clientWidth;
+        const screenH = container.clientHeight;
+        let finalW, finalH;
+        if (screenW / screenH < aspect) {
+            finalW = screenW;
+            finalH = screenW / aspect;
+        } else {
+            finalH = screenH;
+            finalW = screenH * aspect;
+        }
+        this.canvas.width = CONFIG.WIDTH;
+        this.canvas.height = CONFIG.HEIGHT;
+        this.canvas.style.width = finalW + 'px';
+        this.canvas.style.height = finalH + 'px';
+    },
+
+    start: function(modeString) {
+        if (modeString.includes('pve')) {
+            this.config.mode = 'pve';
+            this.config.difficulty = modeString.split('_')[1];
+            document.getElementById('p2-type').innerText = `CPU (${this.config.difficulty.toUpperCase()})`;
+        } else {
+            this.config.mode = 'pvp';
+            document.getElementById('p2-type').innerText = 'JOGADOR 2';
+        }
+
+        this.config.brazilianRules = document.getElementById('rule-brazilian').checked;
+        
+        document.getElementById('main-menu').classList.add('hidden');
+        document.getElementById('game-over-screen').classList.add('hidden');
+        document.getElementById('p1-type').innerText = 'SUA VEZ';
+        
+        this.currentPlayer = 1;
+        this.setupRack();
+        this.state = 'AIMING';
+        this.matchState = { 
+            assigned: null, p1Team: null, foul: false, pottedThisTurn: [], gameOver: false,
+            p1PotCount: 0, p2PotCount: 0
+        };
+        
+        this.updateUI();
+    },
+
+    setupRack: function() {
+        this.balls = [];
+        this.balls.push(new Ball(0, CONFIG.WIDTH * 0.25, CONFIG.HEIGHT/2));
+        
+        const startX = CONFIG.WIDTH * 0.75;
+        const startY = CONFIG.HEIGHT / 2;
+        const r = CONFIG.BALL_RADIUS;
+        
+        let pool = [1,2,3,4,5,6,7,9,10,11,12,13,14,15];
+        pool.sort(() => Math.random() - 0.5);
+        
+        let pIdx = 0;
+        for(let col=0; col<5; col++) {
+            for(let row=0; row<=col; row++) {
+                const x = startX + col * (r*2 * 0.866) + col;
+                const y = startY - (col*r) + (row*r*2) + row;
+                let id;
+                if (col===2 && row===1) {
+                    id = 8; 
+                } else if (col===4 && row===0) {
+                     id = pool.pop(); 
+                } else if (col===4 && row===4) {
+                     id = pool.pop(); 
+                } else {
+                    id = pool.pop();
+                }
+                this.balls.push(new Ball(id, x, y));
+            }
+        }
+    },
+
+    shoot: function(vector, power, spin) {
+        const cueBall = this.balls[0];
+        if (!cueBall || !cueBall.active) return;
+        cueBall.vel = vector.mult(power);
+        this.state = 'RUNNING';
+        this.matchState.pottedThisTurn = [];
+        this.matchState.foul = false;
+    },
+
+    onBallPot: function(ball) {
+        this.matchState.pottedThisTurn.push(ball.id);
+        
+        if (ball.id !== 0) {
+            // Incrementar contadores se já houver times, ou apenas geral
+            if(this.currentPlayer === 1) this.matchState.p1PotCount++;
+            else this.matchState.p2PotCount++;
+            
+            if(ball.id === 8) UI.notify("BOLA 8!");
+        } else {
+            this.matchState.foul = true;
+            UI.notify("FALTA! (Branca encaçapada)");
+            setTimeout(() => {
+                ball.inPocket = false;
+                ball.pocketAlpha = 1;
+                ball.pocketScale = 1;
+                ball.active = true;
+                ball.vel = new Vector2(0,0);
+                ball.pos = new Vector2(CONFIG.WIDTH * 0.25, CONFIG.HEIGHT/2);
+            }, 500);
+        }
+        this.updateUI(); // Atualiza contador
+    },
+
+    loop: function() {
+        this.update();
+        this.draw();
+        requestAnimationFrame(() => this.loop());
+    },
+
+    update: function() {
+        if (this.state === 'RUNNING') {
+            let moving = false;
+            const steps = CONFIG.PHYSICS_SUBSTEPS;
+            for(let i=0; i<steps; i++) {
+                this.balls.forEach(b => b.update()); 
+                Physics.resolveCollisions(this.balls, this.pockets); 
+                Physics.checkPockets(this.balls, this.pockets);
+            }
+            
+            moving = this.balls.some(b => b.active && !b.inPocket && b.vel.magSq() > 0.001);
+            
+            if (!moving) {
+                this.endTurn();
+            }
+        } 
+        else if (this.state === 'AIMING' && this.currentPlayer === 2 && this.config.mode === 'pve') {
+            AI.update();
+        }
+        
+        this.juice.shake *= 0.9;
+        if(this.juice.shake < 0.5) this.juice.shake = 0;
+    },
+
+    endTurn: function() {
+        const potted = this.matchState.pottedThisTurn;
+        let turnContinues = false;
+        let foul = this.matchState.foul;
+        let msg = "";
+
+        if (potted.includes(8)) {
+            const myTeam = this.matchState.assigned ? 
+                           (this.currentPlayer === 1 ? this.matchState.p1Team : (this.matchState.p1Team==='SOLIDS'?'STRIPES':'SOLIDS')) 
+                           : null;
+            
+            const remaining = this.balls.filter(b => b.active && !b.inPocket && b.id !== 0 && b.id !== 8 && 
+                (myTeam ? (myTeam === 'SOLIDS' ? b.id<8 : b.id>8) : true) 
+            ).length;
+
+            if (foul || remaining > 0) {
+                this.gameOver(this.currentPlayer === 1 ? 2 : 1);
+            } else {
+                this.gameOver(this.currentPlayer); 
+            }
+            return;
+        }
+
+        if (!this.matchState.assigned && potted.length > 0 && !foul) {
+            const firstBall = potted.find(id => id !== 0);
+            if (firstBall) {
+                const isSolid = firstBall < 8;
+                this.matchState.assigned = true;
+                this.matchState.p1Team = (this.currentPlayer === 1) ? (isSolid ? 'SOLIDS' : 'STRIPES') : (isSolid ? 'STRIPES' : 'SOLIDS');
+                msg = isSolid ? "LISAS" : "LISTRADAS";
+                UI.notify(`Times Definidos: ${msg}`);
+            }
+        }
+
+        if (!foul && potted.length > 0) {
+            if (this.matchState.assigned) {
+                const myTeam = (this.currentPlayer === 1) ? this.matchState.p1Team : (this.matchState.p1Team==='SOLIDS'?'STRIPES':'SOLIDS');
+                const hitMine = potted.some(id => id !== 0 && (myTeam === 'SOLIDS' ? id < 8 : id > 8));
+                
+                if (hitMine) {
+                    turnContinues = true;
+                } else {
+                    turnContinues = false;
+                    UI.notify("Bola adversária!");
+                }
+            } else {
+                turnContinues = true;
+            }
+        }
+
+        if (this.config.brazilianRules && foul) {
+            UI.notify("FALTA! Castigo aplicado.");
+        }
+
+        if (turnContinues) {
+            this.state = 'AIMING';
+        } else {
+            this.state = 'AIMING';
+            this.currentPlayer = this.currentPlayer === 1 ? 2 : 1;
+            UI.notify("Troca de Turno");
+        }
+        
+        this.updateUI();
+    },
+
+    gameOver: function(winnerId) {
+        this.state = 'GAMEOVER';
+        this.matchState.gameOver = true;
+        const name = winnerId === 1 ? "JOGADOR 1" : (this.config.mode === 'pve' ? "CPU" : "JOGADOR 2");
+        document.getElementById('winner-text').innerText = `${name} VENCEU!`;
+        document.getElementById('game-over-screen').classList.remove('hidden');
+        if(winnerId === 1) Economy.addCoins(50);
+    },
+    
+    resetToMenu: function() {
+        document.getElementById('main-menu').classList.remove('hidden');
+        UI.showMainMenu(); // Reset menu view
+    },
+    
+    rematch: function() {
+        this.start(this.config.mode === 'pve' ? `pve_${this.config.difficulty}` : 'pvp');
+    },
+
+    draw: function() {
+        const ctx = this.ctx;
+        const W = CONFIG.WIDTH;
+        const H = CONFIG.HEIGHT;
+
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0,0,W,H);
+
+        ctx.save();
+        if (this.juice.shake > 0) {
+            ctx.translate((Math.random()-0.5)*this.juice.shake, (Math.random()-0.5)*this.juice.shake);
+        }
+
+        ctx.fillStyle = '#2a1b15';
+        ctx.fillRect(0,0,W,H);
+        
+        const woodGrad = ctx.createLinearGradient(0,0,W,H);
+        woodGrad.addColorStop(0, '#5d4037');
+        woodGrad.addColorStop(0.5, '#3e2723');
+        woodGrad.addColorStop(1, '#2a1b15');
+        ctx.fillStyle = woodGrad;
+        ctx.fillRect(0,0,W,H);
+
+        const C = CONFIG.CUSHION_SIZE;
+        ctx.translate(C, C);
+        
+        ctx.shadowColor = 'black';
+        ctx.shadowBlur = 20;
+        ctx.fillStyle = '#0f6b36';
+        ctx.fillRect(0, 0, W-C*2, H-C*2);
+        ctx.shadowBlur = 0; 
+
+        if (this.tableTexture) {
+            ctx.fillStyle = this.tableTexture;
+            ctx.fillRect(0, 0, W-C*2, H-C*2);
+        }
+        
+        const vign = ctx.createRadialGradient((W-C*2)/2, (H-C*2)/2, H/4, (W-C*2)/2, (H-C*2)/2, W/1.5);
+        vign.addColorStop(0, 'rgba(0,0,0,0)');
+        vign.addColorStop(1, 'rgba(0,0,0,0.4)');
+        ctx.fillStyle = vign;
+        ctx.fillRect(0,0,W-C*2, H-C*2);
+        
+        ctx.translate(-C, -C); 
+
+        this.pockets.forEach(p => {
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, CONFIG.POCKET_RADIUS, 0, Math.PI*2);
+            ctx.fillStyle = '#000';
+            ctx.fill();
+            
+            const g = ctx.createRadialGradient(p.x, p.y, CONFIG.POCKET_RADIUS*0.5, p.x, p.y, CONFIG.POCKET_RADIUS);
+            g.addColorStop(0, '#000');
+            g.addColorStop(1, '#111');
+            ctx.fillStyle = g;
+            ctx.fill();
+            
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, CONFIG.POCKET_RADIUS + 2, 0, Math.PI*2);
+            ctx.strokeStyle = '#ffd700';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+        });
+
+        this.balls.forEach(b => b.draw(ctx));
+
+        if (this.state === 'AIMING' && this.currentPlayer === 1) {
+            Input.draw(ctx, this.balls[0]);
+        }
+
+        ctx.restore(); 
+    },
+    
+    updateUI: function() {
+        const p1 = document.getElementById('player1-card');
+        const p2 = document.getElementById('player2-card');
+        
+        // Atualiza contadores de bolas
+        document.getElementById('p1-score-badge').innerText = `BOLAS: ${this.matchState.p1PotCount}`;
+        document.getElementById('p2-score-badge').innerText = `BOLAS: ${this.matchState.p2PotCount}`;
+
+        if (this.currentPlayer === 1) {
+            p1.classList.add('active'); p2.classList.remove('active');
+            p1.querySelector('.player-type').innerText = "SUA VEZ";
+            p2.querySelector('.player-type').innerText = "AGUARDANDO";
+        } else {
+            p2.classList.add('active'); p1.classList.remove('active');
+            p1.querySelector('.player-type').innerText = "AGUARDANDO";
+            p2.querySelector('.player-type').innerText = this.config.mode === 'pve' ? "PENSANDO..." : "SUA VEZ";
+        }
+        
+        if (this.matchState.assigned) {
+            const p1S = this.matchState.p1Team === 'SOLIDS' ? 'LISAS (1-7)' : 'LISTRADAS (9-15)';
+            const p2S = this.matchState.p1Team === 'SOLIDS' ? 'LISTRADAS (9-15)' : 'LISAS (1-7)';
+            if (this.currentPlayer===1) p1.querySelector('.player-type').innerText += ` • ${p1S}`;
+            else p2.querySelector('.player-type').innerText += ` • ${p2S}`;
+        }
+    }
+};
+
+// --- INPUT & CONTROL ---
+
+const Input = {
+    dragStart: null,
+    currentPos: null,
+    active: false,
+    power: 0,
+    cueSpin: new Vector2(0,0),
+    
+    init: function(canvas) {
+        const getPos = (e) => {
+            const r = canvas.getBoundingClientRect();
+            const x = (e.touches ? e.touches[0].clientX : e.clientX) - r.left;
+            const y = (e.touches ? e.touches[0].clientY : e.clientY) - r.top;
+            return new Vector2(x * (canvas.width/r.width), y * (canvas.height/r.height));
+        };
+
+        canvas.addEventListener('mousedown', e => this.start(getPos(e)));
+        canvas.addEventListener('touchstart', e => this.start(getPos(e)));
+        window.addEventListener('mousemove', e => this.move(getPos(e)));
+        window.addEventListener('touchmove', e => this.move(getPos(e)));
+        window.addEventListener('mouseup', () => this.end());
+        window.addEventListener('touchend', () => this.end());
+        
+        const pad = document.getElementById('spinCtrl');
+        const dot = document.getElementById('spinDot');
+        const handleSpin = (e) => {
+            e.preventDefault();
+            const r = pad.getBoundingClientRect();
+            const cx = e.clientX || e.touches[0].clientX;
+            const cy = e.clientY || e.touches[0].clientY;
+            let x = (cx - r.left - 35) / 35;
+            let y = (cy - r.top - 35) / 35;
+            const d = Math.sqrt(x*x + y*y);
+            if(d>1) { x/=d; y/=d; }
+            this.cueSpin = new Vector2(x, y);
+            dot.style.left = (50 + x*50) + '%';
+            dot.style.top = (50 + y*50) + '%';
+        };
+        pad.addEventListener('mousedown', (e) => { pad.onmousemove = handleSpin; handleSpin(e); });
+        pad.addEventListener('mouseup', () => pad.onmousemove = null);
+        pad.addEventListener('touchstart', handleSpin);
+        pad.addEventListener('touchmove', handleSpin);
+    },
+
+    start: function(pos) {
+        if (Game.state !== 'AIMING' || Game.currentPlayer !== 1) return;
+        this.active = true;
+        this.dragStart = pos;
+        this.currentPos = pos;
+    },
+
+    move: function(pos) {
+        if (!this.active) return;
+        this.currentPos = pos;
+        const dist = this.dragStart.dist(this.currentPos);
+        this.power = Math.min(dist * 0.15, CONFIG.MAX_POWER);
+        const pct = (this.power / CONFIG.MAX_POWER) * 100;
+        const bar = document.getElementById('powerBar');
+        bar.style.width = pct + '%';
+        bar.style.background = `linear-gradient(90deg, #ffeb3b, hsl(${120 - pct*1.2}, 100%, 50%))`;
+    },
+
+    end: function() {
+        if (!this.active) return;
+        this.active = false;
+        if (this.power > 1) {
+            const dir = this.dragStart.sub(this.currentPos).norm();
+            Game.shoot(dir, this.power, this.cueSpin);
+        }
+        this.power = 0;
+        document.getElementById('powerBar').style.width = '0%';
+    },
+
+    draw: function(ctx, cueBall) {
+        if (!this.active || !cueBall) return;
+        
+        const dir = this.dragStart.sub(this.currentPos).norm();
+        if (dir.mag() === 0) return;
+
+        ctx.beginPath();
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([10, 10]);
+        ctx.moveTo(cueBall.pos.x, cueBall.pos.y);
+        ctx.lineTo(cueBall.pos.x + dir.x*800, cueBall.pos.y + dir.y*800);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        
+        ctx.save();
+        ctx.translate(cueBall.pos.x, cueBall.pos.y);
+        ctx.rotate(Math.atan2(dir.y, dir.x));
+        
+        const pullback = 20 + this.power * 3;
+        ctx.translate(-pullback - 280, 0); 
+        
+        ctx.fillStyle = Economy.getCueColor();
+        ctx.fillRect(0, -4, 280, 8);
+        ctx.fillStyle = 'rgba(0,0,0,0.2)';
+        ctx.fillRect(0, 0, 280, 4); 
+        ctx.fillStyle = '#eee';
+        ctx.fillRect(270, -4, 10, 8);
+        ctx.fillStyle = '#00f';
+        ctx.fillRect(280, -3, 3, 6);
+        
+        ctx.restore();
+    }
+};
+
+// --- AI OPPONENT ---
+
+const AI = {
+    timer: 0,
+    update: function() {
+        if (Game.state !== 'AIMING') return;
+        this.timer++;
+        if (this.timer > 100) { 
+            this.timer = 0;
+            this.executeShot();
+        }
+    },
+    executeShot: function() {
+        let targets = Game.balls.filter(b => b.active && b.id !== 0 && !b.inPocket);
+        if (Game.matchState.assigned) {
+             const aiTeam = Game.matchState.p1Team === 'SOLIDS' ? 'STRIPES' : 'SOLIDS';
+             const isSolid = aiTeam === 'SOLIDS';
+             const myBalls = targets.filter(b => (isSolid ? b.id < 8 : b.id > 8));
+             if (myBalls.length > 0) targets = myBalls;
+             else targets = [Game.balls.find(b => b.id === 8)]; 
+        } else {
+            targets = targets.filter(b => b.id !== 8);
+        }
+        if (!targets.length) return; 
+        
+        const target = targets[Math.floor(Math.random() * targets.length)];
+        const pocket = Game.pockets[Math.floor(Math.random() * Game.pockets.length)];
+        
+        const pocketVec = pocket.sub(target.pos).norm();
+        const ghostPos = target.pos.sub(pocketVec.mult(CONFIG.BALL_RADIUS * 2));
+        const cueBall = Game.balls[0];
+        const shotDir = ghostPos.sub(cueBall.pos).norm();
+        
+        const diff = Game.config.difficulty;
+        let error = 0.1;
+        if (diff === 'med') error = 0.03;
+        if (diff === 'hard') error = 0.005;
+        
+        const angleErr = (Math.random() - 0.5) * error;
+        const finalX = shotDir.x * Math.cos(angleErr) - shotDir.y * Math.sin(angleErr);
+        const finalY = shotDir.x * Math.sin(angleErr) + shotDir.y * Math.cos(angleErr);
+        const power = 15 + Math.random() * 10;
+        
+        Game.shoot(new Vector2(finalX, finalY), power, new Vector2(0,0));
+    }
+};
+
+// --- ECONOMY & UI HELPERS ---
+
+const Economy = {
+    coins: 100,
+    inventory: ['cue_standard'],
+    equipped: 'cue_standard',
+    items: [
+        { id: 'cue_standard', name: 'Madeira Padrão', price: 0, color: '#8d6e63' },
+        { id: 'cue_carbon', name: 'Fibra de Carbono', price: 200, color: '#212121' },
+        { id: 'cue_blue', name: 'Chama Azul', price: 500, color: '#1565c0' },
+        { id: 'cue_gold', name: 'Mestre Dourado', price: 1000, color: '#ffd700' }
+    ],
+    redeemedCodes: [],
+
+    init: function() {
+        const s = localStorage.getItem('smc_save_v2');
+        if (s) {
+            const data = JSON.parse(s);
+            this.coins = data.coins;
+            this.inventory = data.inventory;
+            this.equipped = data.equipped;
+            if(data.redeemedCodes) this.redeemedCodes = data.redeemedCodes;
+        }
+        this.updateUI();
+    },
+    
+    save: function() {
+        localStorage.setItem('smc_save_v2', JSON.stringify({
+            coins: this.coins,
+            inventory: this.inventory,
+            equipped: this.equipped,
+            redeemedCodes: this.redeemedCodes
+        }));
+        this.updateUI();
+    },
+    
+    addCoins: function(n) {
+        this.coins += n;
+        this.save();
+        UI.notify(`+$${n}`);
+    },
+
+    redeemCode: function() {
+        const input = document.getElementById('promo-code-input');
+        const code = input.value.trim();
+        
+        if (code === 'dev23') {
+            if (this.redeemedCodes.includes(code)) {
+                UI.notify("Código já usado!");
+            } else {
+                this.addCoins(10000);
+                this.redeemedCodes.push(code);
+                this.save();
+                UI.notify("Sucesso! +$10.000");
+                input.value = "";
+            }
+        } else {
+            UI.notify("Código Inválido");
+        }
+    },
+    
+    buyOrEquip: function(id) {
+        const item = this.items.find(i => i.id === id);
+        if (this.inventory.includes(id)) {
+            this.equipped = id;
+        } else if (this.coins >= item.price) {
+            this.coins -= item.price;
+            this.inventory.push(id);
+            this.equipped = id;
+        }
+        this.save();
+        UI.showShop(); 
+    },
+    
+    getCueColor: function() {
+        return this.items.find(i => i.id === this.equipped).color;
+    },
+    
+    updateUI: function() {
+        document.getElementById('score-display').innerText = `$${this.coins}`;
+    }
+};
+
+const UI = {
+    notify: function(text) {
+        const el = document.getElementById('notification');
+        el.innerText = text;
+        el.classList.add('show');
+        setTimeout(() => el.classList.remove('show'), 2000);
+    },
+    
+    // Menu Navigation
+    showDifficultyMenu: function() {
+        document.getElementById('menu-root').classList.add('hidden');
+        document.getElementById('menu-difficulty').classList.remove('hidden');
+    },
+    hideDifficultyMenu: function() {
+        document.getElementById('menu-difficulty').classList.add('hidden');
+        document.getElementById('menu-root').classList.remove('hidden');
+    },
+    showMainMenu: function() {
+        this.hideDifficultyMenu();
+    },
+    
+    showShop: function() {
+        const grid = document.getElementById('shop-items');
+        grid.innerHTML = '';
+        document.getElementById('shop-balance').innerText = `SEU SALDO: $${Economy.coins}`;
+        
+        Economy.items.forEach(item => {
+            const owned = Economy.inventory.includes(item.id);
+            const equipped = Economy.equipped === item.id;
+            
+            const div = document.createElement('div');
+            div.className = `shop-item ${owned?'owned':''} ${equipped?'selected':''}`;
+            div.innerHTML = `
+                <div class="cue-preview" style="background:${item.color}"></div>
+                <h3 style="margin:5px 0; color:#fff">${item.name}</h3>
+                <div style="color:${owned ? '#4caf50' : '#ffc107'}">${owned ? 'ADQUIRIDO' : '$'+item.price}</div>
+            `;
+            div.onclick = () => Economy.buyOrEquip(item.id);
+            grid.appendChild(div);
+        });
+        document.getElementById('shop-screen').classList.remove('hidden');
+    },
+    
+    hideShop: function() {
+        document.getElementById('shop-screen').classList.add('hidden');
+    }
+};
+
+// --- BOOTSTRAP ---
+window.onload = function() {
+    Game.init();
+};
+
+</script>
+</body>
+</html>
